@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { processPdfFiles } from './backend/pdfProcessor.js';
+import { processPdfFiles as processPdfFilesPerfil } from './backend/pdfPerfilProcessor.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -42,7 +43,7 @@ const upload = multer({
 // Servir archivos estáticos
 app.use(express.static('public'));
 
-// Endpoint para procesar PDFs
+// Endpoint para procesar PDFs NACION
 app.post('/api/process', upload.array('pdfs', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -67,6 +68,44 @@ app.post('/api/process', upload.array('pdfs', 10), async (req, res) => {
     });
   } catch (error) {
     console.error('Error procesando PDFs:', error);
+    res.status(500).json({ 
+      error: error.message || 'Error al procesar los archivos PDF' 
+    });
+    
+    // Limpiar archivos en caso de error
+    if (req.files) {
+      req.files.forEach(file => {
+        try { fs.unlinkSync(file.path); } catch (e) {}
+      });
+    }
+  }
+});
+
+// Endpoint para procesar PDFs PERFIL
+app.post('/api/process-perfil', upload.array('pdfs', 10), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'No se proporcionaron archivos PDF' });
+    }
+
+    const pdfPaths = req.files.map(file => file.path);
+    const outputPath = await processPdfFilesPerfil(pdfPaths);
+
+    // Enviar el archivo Excel como respuesta
+    res.download(outputPath, 'resumen_cargas.xlsx', (err) => {
+      if (err) {
+        console.error('Error al enviar archivo:', err);
+        res.status(500).json({ error: 'Error al generar el archivo Excel' });
+      }
+      
+      // Limpiar archivos temporales
+      pdfPaths.forEach(pdfPath => {
+        try { fs.unlinkSync(pdfPath); } catch (e) {}
+      });
+      try { fs.unlinkSync(outputPath); } catch (e) {}
+    });
+  } catch (error) {
+    console.error('Error procesando PDFs PERFIL:', error);
     res.status(500).json({ 
       error: error.message || 'Error al procesar los archivos PDF' 
     });
