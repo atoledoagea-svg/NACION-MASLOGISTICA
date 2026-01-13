@@ -1,7 +1,18 @@
 {
+  "version": 2,
+  "buildCommand": null,
+  "outputDirectory": null,
+  "framework": null,
   "functions": {
     "api/**/*.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    }
+  ],
+  "cleanUrls": true
 }

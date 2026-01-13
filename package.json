@@ -2,7 +2,7 @@
   "name": "pdf-credit-note-processor",
   "version": "1.0.0",
   "description": "Web application to process credit note PDFs and extract table data",
-  "main": "server.js",
+  "main": "api/process.js",
   "type": "module",
   "scripts": {
     "start": "node server.js",
