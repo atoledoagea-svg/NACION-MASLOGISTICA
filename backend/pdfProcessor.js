@@ -12,11 +12,20 @@ const pdfjsLib = pdfjsModule.default || pdfjsModule;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configurar worker para pdfjs
-// En Node.js, pdfjs-dist puede funcionar sin worker configurado explícitamente
-// Si es necesario, se puede configurar una ruta local al worker
-// Por ahora, dejamos que pdfjs use su configuración por defecto para Node.js
-// (En Node.js, el worker es opcional y puede funcionar sin él)
+// Configurar worker para pdfjs - deshabilitar en entornos serverless
+// En Vercel/serverless, el worker no está disponible
+// Configurar antes de usar getDocument
+try {
+  if (pdfjsLib.GlobalWorkerOptions) {
+    // Deshabilitar el worker completamente
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    // En Node.js/serverless, no usar worker
+    delete pdfjsLib.GlobalWorkerOptions.workerPort;
+  }
+} catch (e) {
+  // Ignorar errores de configuración
+  console.warn('No se pudo configurar el worker de pdfjs:', e.message);
+}
 
 // Headers esperados en el PDF
 const HEADERS = ["Publicación", "Edición", "Concepto", "Cantidad", "Precio", "Recargo", "Importe"];
@@ -201,7 +210,35 @@ async function processPdf(pdfPath) {
   
   // Leer el archivo PDF
   const data = new Uint8Array(fs.readFileSync(pdfPath));
-  const pdf = await pdfjsLib.getDocument({ data }).promise;
+  
+  // Configurar getDocument sin worker para entornos serverless
+  // Envolver en try-catch para manejar errores del worker
+  let pdf;
+  try {
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: data,
+      useWorkerFetch: false,
+      verbosity: 0, // Reducir logs
+      // Opciones para evitar el worker
+      disableAutoFetch: false,
+      disableStream: false
+    });
+    
+    pdf = await loadingTask.promise;
+  } catch (workerError) {
+    // Si falla por el worker, intentar de nuevo con configuración mínima
+    if (workerError.message && workerError.message.includes('worker')) {
+      console.warn('Error del worker, reintentando sin worker...');
+      const loadingTask = pdfjsLib.getDocument({ 
+        data: data,
+        useWorkerFetch: false,
+        verbosity: 0
+      });
+      pdf = await loadingTask.promise;
+    } else {
+      throw workerError;
+    }
+  }
   
   let nRefGlobal = "";
   
