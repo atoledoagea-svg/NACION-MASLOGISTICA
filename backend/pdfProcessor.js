@@ -12,19 +12,50 @@ const pdfjsLib = pdfjsModule.default || pdfjsModule;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Configurar worker para pdfjs - deshabilitar en entornos serverless
-// En Vercel/serverless, el worker no está disponible
-// Configurar antes de usar getDocument
+// Configurar worker para pdfjs en entornos serverless (Vercel)
+// Solución: usar el worker como string inline o deshabilitarlo completamente
 try {
   if (pdfjsLib.GlobalWorkerOptions) {
-    // Deshabilitar el worker completamente
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    // En Node.js/serverless, no usar worker
-    delete pdfjsLib.GlobalWorkerOptions.workerPort;
+    // En Vercel, el worker está en /var/task/node_modules/pdfjs-dist/legacy/build/pdf.worker.js
+    // Intentar cargar el worker como string y usarlo inline
+    const workerPath = path.join('/var/task', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.js');
+    
+    if (fs.existsSync(workerPath)) {
+      // Leer el worker como string y usarlo inline
+      const workerCode = fs.readFileSync(workerPath, 'utf8');
+      // Crear un blob URL o usar el código directamente
+      pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+    } else {
+      // Si no existe, intentar otras rutas
+      const altPaths = [
+        path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.js'),
+        path.join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.js'),
+      ];
+      
+      let found = false;
+      for (const altPath of altPaths) {
+        if (fs.existsSync(altPath)) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = altPath;
+          found = true;
+          break;
+        }
+      }
+      
+      // Si no se encuentra, deshabilitar el worker completamente
+      if (!found) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      }
+    }
   }
 } catch (e) {
-  // Ignorar errores de configuración
-  console.warn('No se pudo configurar el worker de pdfjs:', e.message);
+  // Si falla, deshabilitar el worker
+  try {
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+    }
+  } catch (e2) {
+    // Ignorar errores
+  }
 }
 
 // Headers esperados en el PDF
@@ -211,32 +242,44 @@ async function processPdf(pdfPath) {
   // Leer el archivo PDF
   const data = new Uint8Array(fs.readFileSync(pdfPath));
   
-  // Configurar getDocument sin worker para entornos serverless
-  // Envolver en try-catch para manejar errores del worker
+  // Configurar getDocument - usar opciones que eviten el worker
+  // En Vercel, el worker causa problemas, así que lo evitamos completamente
+  const loadingTask = pdfjsLib.getDocument({ 
+    data: data,
+    useWorkerFetch: false,
+    verbosity: 0,
+    // Opciones adicionales para evitar el worker
+    disableAutoFetch: false,
+    disableStream: false,
+    // Forzar modo sin worker
+    useSystemFonts: false
+  });
+  
+  // Capturar el error del worker y manejarlo
   let pdf;
   try {
-    const loadingTask = pdfjsLib.getDocument({ 
-      data: data,
-      useWorkerFetch: false,
-      verbosity: 0, // Reducir logs
-      // Opciones para evitar el worker
-      disableAutoFetch: false,
-      disableStream: false
-    });
-    
     pdf = await loadingTask.promise;
-  } catch (workerError) {
-    // Si falla por el worker, intentar de nuevo con configuración mínima
-    if (workerError.message && workerError.message.includes('worker')) {
-      console.warn('Error del worker, reintentando sin worker...');
-      const loadingTask = pdfjsLib.getDocument({ 
+  } catch (error) {
+    // Si el error es del worker, intentar una solución alternativa
+    if (error.message && (error.message.includes('worker') || error.message.includes('pdf.worker'))) {
+      // Reintentar con configuración mínima y sin worker
+      console.warn('Error del worker detectado, reintentando sin worker...');
+      
+      // Asegurar que el worker esté deshabilitado
+      if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+      }
+      
+      const retryTask = pdfjsLib.getDocument({ 
         data: data,
         useWorkerFetch: false,
         verbosity: 0
       });
-      pdf = await loadingTask.promise;
+      
+      pdf = await retryTask.promise;
     } else {
-      throw workerError;
+      // Si es otro error, lanzarlo
+      throw error;
     }
   }
   
