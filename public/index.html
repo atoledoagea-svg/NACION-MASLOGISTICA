@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Procesador de Documentos</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="selection.css">
+</head>
+<body>
+    <div class="selection-container">
+        <header class="selection-header">
+            <h1>Procesador de Documentos</h1>
+            <p>Selecciona el tipo de documento que deseas procesar</p>
+        </header>
+
+        <main class="selection-main">
+            <div class="options-grid">
+                <div class="option-card" id="pdfNacionOption">
+                    <div class="option-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                    </div>
+                    <h2>PDF NACION</h2>
+                    <p>Procesa notas de crédito en formato PDF de Nación</p>
+                    <button class="option-btn">Seleccionar</button>
+                </div>
+
+                <!-- Espacio para futuras opciones -->
+                <!-- 
+                <div class="option-card disabled">
+                    <div class="option-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        </svg>
+                    </div>
+                    <h2>Otra Opción</h2>
+                    <p>Descripción de otra opción</p>
+                    <button class="option-btn" disabled>Próximamente</button>
+                </div>
+                -->
+            </div>
+        </main>
+    </div>
+
+    <script src="selection.js"></script>
+</body>
+</html>
